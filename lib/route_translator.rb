@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 # This class knows nothing
 # about Rails.root or Rails.application.routes, and therefor is easier to
@@ -204,7 +205,7 @@ class RouteTranslator
     # Generate translation for a single route for one locale
     def translate_route route, locale
       conditions = { :path_info => translate_path(route.path, locale) }
-      conditions[:request_method] = route.conditions[:request_method].source.upcase if route.conditions.has_key? :request_method
+      conditions[:request_method] = parse_request_methods route.conditions[:request_method] if route.conditions.has_key? :request_method
       requirements = route.requirements.merge LOCALE_PARAM_KEY => locale
       defaults = route.defaults.merge LOCALE_PARAM_KEY => locale
       new_name = "#{route.name}_#{locale_suffix(locale)}" if route.name
@@ -220,7 +221,8 @@ class RouteTranslator
     # Translates a path and adds the locale prefix.
     def translate_path path, locale
       final_optional_segments = path.match(/(\(.+\))$/)[1] rescue nil   # i.e: (.:format)
-      path_segments = path.gsub(final_optional_segments,'').split("/")
+      path_without_optional_segments = final_optional_segments ? path.gsub(final_optional_segments,'') : path
+      path_segments = path_without_optional_segments.split("/")
       new_path = path_segments.map{ |seg| translate_path_segment(seg, locale) }.join('/')
       new_path = "/#{locale.downcase}#{new_path}" if add_prefix? locale
       new_path = '/' if new_path.blank?
@@ -254,6 +256,11 @@ class RouteTranslator
       mod.instance_methods.each do |method|
         mod.send :remove_method, method
       end
+    end
+
+    # expects methods regexp to be in a format: /^GET$/ or /^GET|POST$/ and returns array ["GET", "POST"]
+    def parse_request_methods methods_regexp
+      methods_regexp.source.gsub(/\^([a-zA-Z\|]+)\$/, "\\1").split("|")
     end
   end
   include Translator
